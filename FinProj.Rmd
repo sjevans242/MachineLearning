@@ -1,0 +1,93 @@
+---
+title: "Machine Learning Final Project"
+author: "SJ Evans"
+date: "August 14, 2016"
+output: html_document
+---
+
+## Introduction
+
+This report describes the use of machine learning algorithms to model accelerometry data from 6 individuals who participated in weight lifting exercises. The training data was built with exercise specialists instructing the participants to use proper form as well as four other common mistakes in form. The goal was to determine proper form from poor form using the accelerometry data. More information can be found at http://groupware.les.inf.puc-rio.br/har.
+
+## Exploratory Analyses
+
+The training and test data were retrieved from the course website at: https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+```{r, message=FALSE, warning=FALSE}
+training.set <- read.csv("pml-training.csv")
+unknown.set <- read.csv("pml-testing.csv")
+
+## load packages
+library(caret)
+library(e1071)
+```
+
+After importing the data into R and exploring the raw data, it was clear that some of the columns in the final test data set contained only NAs and would not be useful, so were removed from both the training and test data sets.
+
+```{r}
+na.index <- is.na(unknown.set[1,])
+sub.training <- subset(training.set[,!na.index])
+sub.unknown <- subset(unknown.set[,!na.index])
+```
+
+Upon further examination of the data it was surmised that some columns, such as time stamps and the index column, would likely have no predictive value for the exercise class column being modeled, so these columns were removed from both data sets as well.
+
+```{r}
+sub.training <- subset(sub.training[,-c(1,3:6)])
+unknown <- subset(sub.unknown[,-c(1,3:6)])
+```
+
+## Splitting the Data
+
+Since there was a large amount of data, it was decided to split it into three sets for training, testing and validation.
+
+```{r}
+inTrain <- createDataPartition(sub.training$classe,p=0.7,list = FALSE)
+training.temp <- sub.training[inTrain,]
+validation <- sub.training[-inTrain,]
+inTrain2 <- createDataPartition(training.temp$classe,p=0.7,list=FALSE)
+training <- training.temp[inTrain2,]
+testing <- training.temp[-inTrain2,]
+```
+
+This left 55 columns that contained: the users name, since users may perform differently and this was viewed as an important factor; the num_window column, which appeared to demarcate a single motion perfromed by the user; 52 columns of accelerometry data; and the classe column being modeled.
+
+## Training the Model
+
+Since all of the remaining data appeared potentially informative, a random forest model was built using the 'classe' as the outcome measure and all other factors as predictors.
+
+```{r, cachedchunk, cache=TRUE}
+mod1.rf <- train(classe~., data=training, method="rf",prox=TRUE)
+```
+
+Evaluating the model indicated an estimated accuracy of greater than 98%
+
+```{r}
+mod1.rf
+```
+
+## Testing the Model
+
+The model was tested in the test set split off from the original training set.
+
+```{r, message=FALSE}
+pred1.rf <- predict(mod1.rf,testing)
+```
+
+``` {r}
+confusionMatrix(pred1.rf,testing$classe)
+```
+
+The model performed with a 99% accuracy so was tested as is in the validation set split off from the original training data.
+
+```{r}
+pred2.rf <- predict(mod1.rf,validation)
+confusionMatrix(pred2.rf,validation$classe)
+```
+
+The model performed with 99% accuracy in this data set so was applied to predict the exercise type in the supplied test data.
+
+## Conclusion
+
+Developing a model using a random forest machine learning algorithm worked extremely well with this data, with an expected out of sample accuracy of 99%. However, the algorithm was computational intensive and took approximately 2 hours to build on the machine being used.
